@@ -1,0 +1,15 @@
+{
+  "title": "Andrea Tang",
+  "tagline": "Notes on technology, intelligence, and the systems we build.",
+  "description": "Andrea Tang's writing on technology, artificial intelligence, and engineering.",
+  "author": "Andrea Tang",
+  "language": "en",
+  "base_url": "https://maowentang.github.io",
+  "github_url": "https://github.com/MaowenTang",
+  "email": "",
+  "nav": [
+    {"label": "Writing", "url": "/"},
+    {"label": "Archive", "url": "/archive/"},
+    {"label": "About", "url": "/about/"}
+  ]
+}

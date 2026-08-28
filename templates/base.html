@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="{{language}}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{page_title}}</title>
+  <meta name="description" content="{{page_description}}">
+  <meta name="author" content="{{author}}">
+  <meta name="color-scheme" content="light dark">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
+  <meta property="og:title" content="{{page_title}}">
+  <meta property="og:description" content="{{page_description}}">
+  <meta property="og:type" content="{{og_type}}">
+  <meta property="og:url" content="{{canonical_url}}">
+  <link rel="canonical" href="{{canonical_url}}">
+  <link rel="alternate" type="application/rss+xml" title="{{title}}" href="/feed.xml">
+  <link rel="stylesheet" href="/assets/style.css">
+  <script defer src="/assets/site.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#content">Skip to content</a>
+  <header class="site-header">
+    <div class="shell header-inner">
+      <a class="wordmark" href="/" aria-label="{{title}}, home">{{title}}</a>
+      <nav class="nav" aria-label="Primary navigation">{{nav_html}}</nav>
+      <button class="theme-toggle" type="button" aria-label="Toggle color theme" title="Toggle color theme"><span aria-hidden="true">◐</span></button>
+    </div>
+  </header>
+  <main id="content" class="shell">{{content}}</main>
+  <footer class="site-footer shell">
+    <span>© {{year}} {{author}}</span>
+    <span class="footer-links"><a href="{{github_url}}">GitHub</a><a href="/feed.xml">RSS</a></span>
+  </footer>
+</body>
+</html>

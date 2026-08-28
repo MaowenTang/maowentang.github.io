@@ -1,0 +1,12 @@
+{
+  "title": "A place for durable thoughts",
+  "slug": "a-place-for-durable-thoughts",
+  "summary": "Why this site exists, and what I hope to explore here.",
+  "published_at": "2026-08-28",
+  "updated_at": "2026-08-28",
+  "tags": ["Notes"],
+  "featured": true,
+  "sample": true,
+  "source": "local",
+  "content_html": "<p>Technology moves quickly; understanding compounds slowly. This site is a place to keep the ideas that deserve more time: how intelligent systems work, how tools shape our thinking, and how engineering choices become social choices.</p><h2 id=\"what-to-expect\">What to expect</h2><p>Essays here will favor careful explanations over breaking news. Some will be technical, some speculative, and all are meant to remain useful after the week they are published.</p><blockquote><p>Write to clarify the thought, not to decorate it.</p></blockquote><p>This first post is sample content. Once the Notion connection is configured, published notes will appear here automatically.</p>"
+}
