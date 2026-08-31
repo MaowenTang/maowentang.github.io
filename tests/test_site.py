@@ -27,8 +27,7 @@ class BuildTests(unittest.TestCase):
     def test_expected_pages_and_metadata_exist(self):
         expected = [
             "index.html", "about/index.html", "archive/index.html",
-            "posts/a-place-for-durable-thoughts/index.html", "feed.xml",
-            "sitemap.xml", "search.json",
+            "feed.xml", "sitemap.xml", "search.json",
         ]
         for relative in expected:
             self.assertTrue((ROOT / "dist" / relative).exists(), relative)
@@ -36,9 +35,13 @@ class BuildTests(unittest.TestCase):
         self.assertIn("Andrea Tang", homepage)
         self.assertIn('rel="canonical"', homepage)
 
-    def test_search_index_is_valid_json(self):
+    def test_search_index_matches_generated_post_pages(self):
         data = json.loads((ROOT / "dist/search.json").read_text())
-        self.assertEqual(data[0]["url"], "/posts/a-place-for-durable-thoughts/")
+        self.assertTrue(data, "search index should contain at least one post")
+        for post in data:
+            self.assertRegex(post["url"], r"^/posts/[a-z0-9-]+/$")
+            generated = ROOT / "dist" / post["url"].lstrip("/") / "index.html"
+            self.assertTrue(generated.exists(), post["url"])
 
     def test_unsafe_slug_is_rejected(self):
         self.assertFalse(build.re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", "../bad"))
