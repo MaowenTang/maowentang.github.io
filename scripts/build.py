@@ -257,6 +257,7 @@ def main() -> None:
         shutil.rmtree(DIST)
     shutil.copytree(ROOT / "assets", DIST / "assets")
     shutil.copy2(ROOT / "assets/favicon.svg", DIST / "favicon.svg")
+    shutil.copy2(ROOT / "assets/favicon.ico", DIST / "favicon.ico")
     notion_assets = ROOT / "static/notion"
     if notion_assets.exists():
         shutil.copytree(notion_assets, DIST / "assets/notion", dirs_exist_ok=True)

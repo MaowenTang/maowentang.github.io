@@ -27,7 +27,7 @@ class BuildTests(unittest.TestCase):
     def test_expected_pages_and_metadata_exist(self):
         expected = [
             "index.html", "about/index.html", "archive/index.html",
-            "feed.xml", "sitemap.xml", "search.json",
+            "favicon.ico", "feed.xml", "sitemap.xml", "search.json",
         ]
         for relative in expected:
             self.assertTrue((ROOT / "dist" / relative).exists(), relative)
