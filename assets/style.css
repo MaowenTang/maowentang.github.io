@@ -15,12 +15,14 @@
     --paper: #171716; --surface: #222220; --ink: #eceae4; --muted: #aaa79e;
     --line: #393733; --accent: #e18770;
   }
+  :root:not([data-theme="light"]) .identity-symbol__body { stroke: #eceae4; stroke-width: .45; }
 }
 
 :root[data-theme="dark"] {
   --paper: #171716; --surface: #222220; --ink: #eceae4; --muted: #aaa79e;
   --line: #393733; --accent: #e18770;
 }
+:root[data-theme="dark"] .identity-symbol__body { stroke: #eceae4; stroke-width: .45; }
 
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
@@ -52,9 +54,9 @@ a:hover { color: var(--accent); }
 .eyebrow { margin: 0 0 20px; color: var(--accent); font-size: .72rem; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
 .identity-hero { display: grid; grid-template-columns: minmax(0, 680px) 112px; gap: clamp(32px, 6vw, 84px); align-items: end; }
 .intro h1 { max-width: 680px; margin: 0; font: 500 clamp(2.6rem, 4.5vw, 4.2rem)/.96 var(--serif); letter-spacing: -.04em; }
-.identity-symbol { width: 112px; height: 112px; overflow: visible; }
-.identity-symbol__body { fill: var(--ink); }
-.identity-symbol__name { fill: var(--paper); font: 700 2.25px var(--mono); letter-spacing: .12em; }
+.identity-symbol { width: 128px; height: 128px; margin-block: -8px; overflow: visible; }
+.identity-symbol__body { fill: #171714; }
+.identity-symbol__name { fill: #fff; font: 700 2.4px var(--mono); letter-spacing: .08em; }
 .identity-symbol__growth { fill: var(--accent); shape-rendering: crispEdges; }
 .writing { padding: 72px 0 96px; }
 .section-heading { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 16px; }
@@ -125,7 +127,7 @@ a:hover { color: var(--accent); }
   .theme-toggle { display: none; }
   .intro h1 { font-size: clamp(2.4rem, 11vw, 3.3rem); }
   .identity-hero { display: block; }
-  .identity-symbol { width: 58px; height: 58px; margin-top: 22px; }
+  .identity-symbol { width: 68px; height: 68px; margin: 18px 0 -5px; }
   .post-card { grid-template-columns: 1fr auto; gap: 8px 16px; }
   .post-date { grid-column: 1 / -1; }
   .article-layout { display: block; }
