@@ -44,11 +44,15 @@ class BuildTests(unittest.TestCase):
             self.assertTrue(generated.exists(), post["url"])
 
     def test_dual_reading_modes_are_rendered_when_coffee_content_exists(self):
-        article = (ROOT / "dist/posts/a-place-for-durable-thoughts/index.html").read_text()
-        self.assertIn('data-reading-mode="coffee"', article)
-        self.assertIn('data-reading-mode="long"', article)
-        self.assertIn('data-reading-panel="coffee"', article)
-        self.assertIn('data-reading-panel="long"', article)
+        experience, default_minutes = build.reading_experience({
+            "coffee_html": "<p>Short version.</p>",
+            "content_html": "<p>Long version.</p>",
+        })
+        self.assertEqual(default_minutes, 1)
+        self.assertIn('data-reading-mode="coffee"', experience)
+        self.assertIn('data-reading-mode="long"', experience)
+        self.assertIn('data-reading-panel="coffee"', experience)
+        self.assertIn('data-reading-panel="long"', experience)
 
     def test_unsafe_slug_is_rejected(self):
         self.assertFalse(build.re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", "../bad"))
