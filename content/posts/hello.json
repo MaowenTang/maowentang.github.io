@@ -8,5 +8,6 @@
   "featured": true,
   "sample": true,
   "source": "local",
+  "coffee_html": "<p>This site is a place for ideas that deserve more than a quick reaction. In the Coffee Time version, each note starts with the shortest useful path through the idea.</p><h2 id=\"why-two-versions\">Why two versions?</h2><p>Some days call for a careful deep dive. Other days only leave time for one cup of coffee. Both should lead to the same core insight.</p>",
   "content_html": "<p>Technology moves quickly; understanding compounds slowly. This site is a place to keep the ideas that deserve more time: how intelligent systems work, how tools shape our thinking, and how engineering choices become social choices.</p><h2 id=\"what-to-expect\">What to expect</h2><p>Essays here will favor careful explanations over breaking news. Some will be technical, some speculative, and all are meant to remain useful after the week they are published.</p><blockquote><p>Write to clarify the thought, not to decorate it.</p></blockquote><p>This first post is sample content. Once the Notion connection is configured, published notes will appear here automatically.</p>"
 }

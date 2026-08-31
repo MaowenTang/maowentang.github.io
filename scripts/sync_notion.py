@@ -296,10 +296,24 @@ def page_to_post(page: dict) -> dict | None:
     tags_prop = properties.get("Tags", {})
     tags = [item["name"] for item in tags_prop.get("multi_select", [])]
     featured = bool(properties.get("Featured", {}).get("checkbox", False))
-    content = render_blocks(block_children(page["id"]), page["id"])
+    blocks = block_children(page["id"])
+    coffee_blocks = []
+    long_blocks = []
+    for block in blocks:
+        if block.get("type") == "toggle":
+            label = "".join(
+                item.get("plain_text", "")
+                for item in block.get("toggle", {}).get("rich_text", [])
+            ).strip().casefold()
+            if label in {"coffee time", "coffee time reading"}:
+                coffee_blocks.extend(block.get("_children", []))
+                continue
+        long_blocks.append(block)
+    content = render_blocks(long_blocks, page["id"])
+    coffee_content = render_blocks(coffee_blocks, page["id"]) if coffee_blocks else ""
     if not summary:
         summary = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", content)).strip()[:180]
-    return {
+    post = {
         "title": title,
         "slug": slug,
         "summary": summary,
@@ -311,6 +325,9 @@ def page_to_post(page: dict) -> dict | None:
         "notion_page_id": page["id"],
         "content_html": content,
     }
+    if coffee_content:
+        post["coffee_html"] = coffee_content
+    return post
 
 
 def main() -> None:

@@ -3,11 +3,8 @@
     <a class="back-link" href="/">← Writing</a>
     <h1>{{post_title}}</h1>
     <p class="article-summary">{{summary}}</p>
-    <div class="post-meta"><time datetime="{{date_iso}}">{{date_display}}</time><span>{{reading_time}} min read</span></div>
+    <div class="post-meta"><time datetime="{{date_iso}}">{{date_display}}</time><span class="reading-time">{{default_reading_time}} min read</span></div>
   </header>
-  <div class="article-layout">
-    <aside class="toc" aria-label="On this page">{{toc}}</aside>
-    <div class="prose">{{post_content}}</div>
-  </div>
+  {{reading_experience}}
   <footer class="article-footer">{{tags_html}}<a href="/">More writing →</a></footer>
 </article>

@@ -43,6 +43,13 @@ class BuildTests(unittest.TestCase):
             generated = ROOT / "dist" / post["url"].lstrip("/") / "index.html"
             self.assertTrue(generated.exists(), post["url"])
 
+    def test_dual_reading_modes_are_rendered_when_coffee_content_exists(self):
+        article = (ROOT / "dist/posts/a-place-for-durable-thoughts/index.html").read_text()
+        self.assertIn('data-reading-mode="coffee"', article)
+        self.assertIn('data-reading-mode="long"', article)
+        self.assertIn('data-reading-panel="coffee"', article)
+        self.assertIn('data-reading-panel="long"', article)
+
     def test_unsafe_slug_is_rejected(self):
         self.assertFalse(build.re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", "../bad"))
 
@@ -93,6 +100,35 @@ class NotionConversionTests(unittest.TestCase):
         result = notion.render_blocks(blocks, "page-id")
         self.assertIn('href="https://example.com/paper.pdf"', result)
         self.assertIn(">Paper</a>", result)
+
+    def test_coffee_toggle_is_split_from_long_read(self):
+        page = {
+            "id": "page-id",
+            "created_time": "2026-08-31T00:00:00Z",
+            "last_edited_time": "2026-08-31T00:00:00Z",
+            "properties": {
+                "Title": {"type": "title", "title": [{"plain_text": "Two Versions"}]},
+                "Status": {"type": "status", "status": {"name": "Published"}},
+            },
+        }
+        blocks = [
+            {"id": "coffee", "type": "toggle", "toggle": {
+                "rich_text": [{"plain_text": "Coffee Time"}]}, "_children": [
+                {"id": "short", "type": "paragraph", "paragraph": {
+                    "rich_text": [{"plain_text": "Short version", "annotations": {}}]}}
+            ]},
+            {"id": "long", "type": "paragraph", "paragraph": {
+                "rich_text": [{"plain_text": "Long version", "annotations": {}}]}},
+        ]
+        original = notion.block_children
+        notion.block_children = lambda _page_id: blocks
+        try:
+            post = notion.page_to_post(page)
+        finally:
+            notion.block_children = original
+        self.assertIn("Short version", post["coffee_html"])
+        self.assertNotIn("Short version", post["content_html"])
+        self.assertIn("Long version", post["content_html"])
 
 
 if __name__ == "__main__":

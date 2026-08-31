@@ -145,14 +145,43 @@ def build_home(config: dict, posts: list[dict]) -> None:
 def build_posts(config: dict, posts: list[dict]) -> None:
     template = load(ROOT / "templates/post.html")
     for post in posts:
+        long_content = post["content_html"]
+        coffee_content = post.get("coffee_html", "").strip()
+        long_minutes = reading_time(long_content)
+        coffee_minutes = reading_time(coffee_content) if coffee_content else None
+        if coffee_content:
+            reading_switcher = (
+                '<div class="reading-switcher" role="tablist" aria-label="Reading version">'
+                f'<button type="button" role="tab" aria-selected="true" data-reading-mode="coffee" data-reading-minutes="{coffee_minutes}">'
+                f'<span>Coffee Time</span><small>{coffee_minutes} min</small></button>'
+                f'<button type="button" role="tab" aria-selected="false" data-reading-mode="long" data-reading-minutes="{long_minutes}">'
+                f'<span>Long Read</span><small>{long_minutes} min</small></button></div>'
+            )
+            coffee_toc = f'<div data-reading-toc="coffee">{toc_for(coffee_content)}</div>'
+            long_toc = f'<div data-reading-toc="long" hidden>{toc_for(long_content)}</div>'
+            panels = (
+                f'<div class="prose" data-reading-panel="coffee">{coffee_content}</div>'
+                f'<div class="prose" data-reading-panel="long" hidden>{long_content}</div>'
+            )
+            default_minutes = coffee_minutes
+        else:
+            reading_switcher = ""
+            coffee_toc = ""
+            long_toc = toc_for(long_content)
+            panels = f'<div class="prose">{long_content}</div>'
+            default_minutes = long_minutes
+        reading_experience = (
+            f'{reading_switcher}<div class="article-layout">'
+            f'<aside class="toc" aria-label="On this page">{coffee_toc}{long_toc}</aside>'
+            f'<div class="reading-panels">{panels}</div></div>'
+        )
         body = render(template, {
             "post_title": html.escape(post["title"]),
             "summary": html.escape(post["summary"]),
             "date_iso": post["published_at"][:10],
             "date_display": date_display(post["published_at"]),
-            "reading_time": reading_time(post["content_html"]),
-            "toc": toc_for(post["content_html"]),
-            "post_content": post["content_html"],
+            "default_reading_time": default_minutes,
+            "reading_experience": reading_experience,
             "tags_html": tags_html(post["tags"]),
         })
         path = f'/posts/{post["slug"]}/'
