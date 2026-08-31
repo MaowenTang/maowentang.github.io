@@ -22,7 +22,13 @@
   <a class="skip-link" href="#content">Skip to content</a>
   <header class="site-header">
     <div class="shell header-inner">
-      <a class="wordmark" href="/" aria-label="{{title}}, home">{{title}}</a>
+      <a class="wordmark" href="/" aria-label="{{title}}, home">
+        <svg class="brand-mark" viewBox="0 0 28 28" aria-hidden="true">
+          <path class="brand-mark__grid" d="M2 2h10v10H2zM16 2h10v10H16zM2 16h10v10H2z"/>
+          <path class="brand-mark__growth" d="M17 17h9v9h-9z"/>
+        </svg>
+        <span>{{title}}</span>
+      </a>
       <nav class="nav" aria-label="Primary navigation">{{nav_html}}</nav>
       <button class="theme-toggle" type="button" aria-label="Toggle color theme" title="Toggle color theme"><span aria-hidden="true">◐</span></button>
     </div>
