@@ -51,7 +51,7 @@ a:hover { color: var(--accent); }
 .intro { padding: clamp(72px, 12vw, 150px) 0 clamp(64px, 10vw, 120px); border-bottom: 1px solid var(--line); }
 .eyebrow { margin: 0 0 20px; color: var(--accent); font-size: .72rem; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
 .identity-hero { display: grid; grid-template-columns: minmax(0, 840px) 168px; gap: clamp(40px, 8vw, 112px); align-items: end; }
-.intro h1 { max-width: 840px; margin: 0; font: 500 clamp(3.5rem, 9vw, 7.4rem)/.92 var(--serif); letter-spacing: -.055em; }
+.intro h1 { max-width: 760px; margin: 0; font: 500 clamp(3rem, 6.5vw, 5.5rem)/.94 var(--serif); letter-spacing: -.045em; }
 .identity-symbol { width: 168px; height: 168px; overflow: visible; }
 .identity-symbol__body { fill: var(--ink); }
 .identity-symbol__growth { fill: var(--accent); shape-rendering: crispEdges; }
@@ -122,7 +122,7 @@ a:hover { color: var(--accent); }
   .nav { gap: 13px; }
   .nav a { font-size: .78rem; }
   .theme-toggle { display: none; }
-  .intro h1 { font-size: clamp(3.3rem, 17vw, 5rem); }
+  .intro h1 { font-size: clamp(2.8rem, 13vw, 4rem); }
   .identity-hero { display: block; }
   .identity-symbol { width: 78px; height: 78px; margin-top: 32px; }
   .post-card { grid-template-columns: 1fr auto; gap: 8px 16px; }
