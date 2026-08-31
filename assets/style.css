@@ -56,7 +56,6 @@ a:hover { color: var(--accent); }
 .intro h1 { max-width: 680px; margin: 0; font: 500 clamp(2.6rem, 4.5vw, 4.2rem)/.96 var(--serif); letter-spacing: -.04em; }
 .identity-symbol { width: 128px; height: 128px; margin-block: -8px; overflow: visible; }
 .identity-symbol__body { fill: #171714; }
-.identity-symbol__name { fill: #fff; font: 700 2.125px var(--sans); text-anchor: middle; dominant-baseline: central; }
 .identity-symbol__growth { fill: var(--accent); shape-rendering: crispEdges; }
 .writing { padding: 72px 0 96px; }
 .section-heading { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 16px; }
