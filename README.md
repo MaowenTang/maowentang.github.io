@@ -17,7 +17,7 @@ Open `http://localhost:8000`.
 
 The homepage starts with About and continues directly into the chronological
 Archive. Navigation links scroll to `/#about` and `/#archive`; there is no
-separate Writing page. The display name, focus line, and LinkedIn/GitHub links
+separate Writing page. The display name and LinkedIn/GitHub links
 are configured in `site.json`. Biography paragraphs are synced from the Notion
 page configured as `notion_about_page_id`; `content/about.html` is the local
 fallback when previewing without Notion credentials. The existing
@@ -64,7 +64,7 @@ Open the dedicated **About Me** record in the same shared Notion database and
 edit its page body. Paragraphs, links, and supported formatting use the same
 converter as articles. Its database `Status` is ignored: the biography syncs
 even while Draft, and that record is excluded from articles, Archive, and RSS
-even if set to Published. The website heading, name, focus line, and profile
+even if set to Published. The website heading, name, and profile
 links remain configured separately in `site.json`.
 
 Current editor: [About Me in Notion](https://www.notion.so/3ec86f31679a80dcbce6c8479891d6a5).

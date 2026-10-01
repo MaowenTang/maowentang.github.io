@@ -225,14 +225,13 @@ def build_about(config: dict, posts: list[dict]) -> None:
     )
     body = render(load(ROOT / "templates/about.html"), {
         "profile_name": html.escape(config["profile_name"]),
-        "profile_focus": html.escape(config["profile_focus"]),
         "profile_links": profile_links,
         "about_content": load(ROOT / "content/about.html"),
         "archive_content": render_archive(posts),
     })
     page = base_page(
         config, body, page_title=config["title"],
-        description=f'About {config["profile_name"]}. {config["profile_focus"]}', path="/"
+        description=f'About {config["profile_name"]}.', path="/"
     )
     write_page("/index.html", page)
     write_page("/about/", page)

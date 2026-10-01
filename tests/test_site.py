@@ -133,14 +133,13 @@ class BuildTests(unittest.TestCase):
     def test_profile_configuration_is_escaped_in_html(self):
         config = json.loads((ROOT / "site.json").read_text())
         config.update({
-            "profile_name": '<Name & "Alias">', "profile_focus": "Research < learning",
+            "profile_name": '<Name & "Alias">',
             "linkedin_url": 'https://example.com/?name="Alias"&topic=<research>',
         })
         with patch.object(build, "write_page") as write:
             build.build_about(config, build.load_posts())
         markup = write.call_args_list[0].args[1]
         self.assertIn(html.escape(config["profile_name"]), markup)
-        self.assertIn(html.escape(config["profile_focus"]), markup)
         self.assertIn(f'href="{html.escape(config["linkedin_url"], quote=True)}"', markup)
         self.assertNotIn(config["profile_name"], markup)
 
