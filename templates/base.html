@@ -6,7 +6,7 @@
   <title>{{page_title}}</title>
   <meta name="description" content="{{page_description}}">
   <meta name="author" content="{{author}}">
-  <meta name="color-scheme" content="light dark">
+  <meta name="color-scheme" content="light">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
   <meta property="og:title" content="{{page_title}}">
   <meta property="og:description" content="{{page_description}}">
@@ -21,19 +21,16 @@
 <body>
   <a class="skip-link" href="#content">Skip to content</a>
   <header class="site-header">
-    <div class="shell header-inner">
+    <div class="header-inner">
       <a class="wordmark" href="/" aria-label="{{title}}, home">
-        <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true">
-          <path class="brand-mark__body" fill-rule="evenodd" d="M2 2h17c6.1 0 11 4.9 11 11s-4.9 11-11 11h-7v6H2V2Zm10 8v6h7a3 3 0 1 0 0-6h-7Z"/>
-          <path class="brand-mark__growth" d="M22 22h8v8h-8z"/>
-        </svg>
         <span>{{title}}</span>
       </a>
+      <p class="site-note">Writing &amp; notes</p>
       <nav class="nav" aria-label="Primary navigation">{{nav_html}}</nav>
-      <button class="theme-toggle" type="button" aria-label="Toggle color theme" title="Toggle color theme"><span aria-hidden="true">◐</span></button>
+      <div class="rail-links"><a href="{{github_url}}">GitHub <span aria-hidden="true">↗</span></a><a href="/feed.xml">RSS <span aria-hidden="true">↗</span></a></div>
     </div>
   </header>
-  <main id="content" class="shell">{{content}}</main>
+  <main id="content" class="site-main shell" tabindex="-1">{{content}}</main>
   <footer class="site-footer shell">
     <span>© {{year}} {{author}}</span>
     <span class="footer-links"><a href="{{github_url}}">GitHub</a><a href="/feed.xml">RSS</a></span>

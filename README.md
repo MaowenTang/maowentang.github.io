@@ -12,6 +12,15 @@ python3 -m http.server 8000 --directory dist
 
 Open `http://localhost:8000`.
 
+## Presentation and motion
+
+The site uses a white, text-only layout with persistent desktop navigation and
+a compact mobile header. Internal pages transition in place; their original
+URLs, metadata, and standard HTML links remain available. Browser history
+preserves reading positions, and reduced-motion preferences disable animations.
+All styling and motion use local CSS and JavaScript, without added libraries.
+Article content continues to come from the existing Notion publishing workflow.
+
 ## Notion publishing
 
 Create a Notion data source with these properties:
