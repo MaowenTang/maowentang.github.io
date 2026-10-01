@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build Andrea Tang's static site using only the Python standard library."""
+"""Build Maowen Tang's static site using only the Python standard library."""
 
 from __future__ import annotations
 
@@ -213,7 +213,7 @@ def build_archive(config: dict, posts: list[dict]) -> None:
     body = render_archive(posts, standalone=True)
     write_page("/archive/", base_page(
         config, body, page_title=f'Archive — {config["title"]}',
-        description="All writing by Andrea Tang.", path="/archive/", canonical_path="/"
+        description=f'All writing by {config["author"]}.', path="/archive/", canonical_path="/"
     ))
 
 

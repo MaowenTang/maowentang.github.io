@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Read published Notion pages and store safe, build-ready article JSON."""
+"""Read Notion biography and published articles into safe, build-ready content."""
 
 from __future__ import annotations
 
@@ -41,7 +41,7 @@ def request(path: str, body: dict | None = None) -> dict:
             "Authorization": f"Bearer {TOKEN}",
             "Notion-Version": VERSION,
             "Content-Type": "application/json",
-            "User-Agent": "AndreaTangSite/1.0",
+            "User-Agent": "MaowenTangSite/1.0",
         },
     )
     for attempt in range(4):
@@ -155,7 +155,7 @@ def download_image(url: str, page_id: str) -> str:
     url = validated_image_url(url)
     target_dir = ROOT / "static/notion" / page_id.replace("-", "")
     target_dir.mkdir(parents=True, exist_ok=True)
-    req = urllib.request.Request(url, headers={"User-Agent": "AndreaTangSite/1.0"})
+    req = urllib.request.Request(url, headers={"User-Agent": "MaowenTangSite/1.0"})
     opener = urllib.request.build_opener(SafeRedirectHandler())
     with opener.open(req, timeout=20) as response:
         validated_image_url(response.geturl())
@@ -330,27 +330,64 @@ def page_to_post(page: dict) -> dict | None:
     return post
 
 
+def configured_about_page_id() -> str:
+    config = json.loads((ROOT / "site.json").read_text(encoding="utf-8"))
+    page_id = config.get("notion_about_page_id", "")
+    if not isinstance(page_id, str):
+        raise ValueError("notion_about_page_id must be a Notion page ID string")
+    page_id = page_id.strip()
+    if page_id and not re.fullmatch(
+        r"[0-9a-fA-F]{32}|[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}", page_id
+    ):
+        raise ValueError("notion_about_page_id must be a 32-character or hyphenated Notion page ID")
+    return page_id
+
+
+def read_about(page_id: str) -> str:
+    page = request(f"/pages/{page_id}")
+    if (page.get("object") != "page"
+            or page.get("id", "").replace("-", "").lower() != page_id.replace("-", "").lower()
+            or page.get("archived") or page.get("in_trash")):
+        raise RuntimeError("Configured Notion About Me page is unavailable or archived")
+    content = render_blocks(block_children(page_id), page_id)
+    # Biography headings share the homepage with its About and Archive anchors.
+    content = re.sub(r'(<h[23] id=")([^"]+)(">)', r'\1about-content-\2\3', content)
+    readable_text = html.unescape(re.sub(r"<[^>]+>", " ", content)).strip()
+    if not readable_text:
+        raise RuntimeError("Configured Notion About Me page has no readable body text")
+    return content
+
+
 def main() -> None:
     if not TOKEN or not DATA_SOURCE_ID:
         print("Notion secrets are not configured; keeping local sample content.")
         return
+    about_id = configured_about_page_id()
+    about_content = read_about(about_id) if about_id else None
     pages = paginated(f"/data_sources/{DATA_SOURCE_ID}/query", {"sorts": [{
         "timestamp": "last_edited_time", "direction": "descending"
     }]})
-    output_dir = ROOT / "content/posts"
-    for old in output_dir.glob("notion-*.json"):
-        old.unlink()
-    published = 0
+    posts = []
     for page in pages:
         if page.get("object") != "page":
+            continue
+        if about_id and page["id"].replace("-", "").lower() == about_id.replace("-", "").lower():
             continue
         post = page_to_post(page)
         if not post:
             continue
-        path = output_dir / f'notion-{page["id"].replace("-", "")}.json'
+        posts.append(post)
+    # Finish all Notion reads and conversions before replacing local content.
+    output_dir = ROOT / "content/posts"
+    for old in output_dir.glob("notion-*.json"):
+        old.unlink()
+    for post in posts:
+        path = output_dir / f'notion-{post["notion_page_id"].replace("-", "")}.json'
         path.write_text(json.dumps(post, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-        published += 1
-    print(f"Synced {published} published Notion page(s).")
+    if about_content is not None:
+        (ROOT / "content/about.html").write_text(about_content + "\n", encoding="utf-8")
+        print("Synced About Me from Notion.")
+    print(f"Synced {len(posts)} published Notion page(s).")
 
 
 if __name__ == "__main__":

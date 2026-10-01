@@ -1,9 +1,11 @@
 import importlib.util
 import html
 from html.parser import HTMLParser
+import io
 import json
 import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -67,7 +69,7 @@ class BuildTests(unittest.TestCase):
         for relative in expected:
             self.assertTrue((ROOT / "dist" / relative).exists(), relative)
         homepage = (ROOT / "dist/index.html").read_text()
-        self.assertIn("Andrea Tang", homepage)
+        self.assertIn("Maowen Tang", homepage)
         self.assertIn('rel="canonical"', homepage)
 
     def test_home_flows_from_about_to_archive_without_a_writing_page(self):
@@ -240,6 +242,168 @@ class NotionConversionTests(unittest.TestCase):
         self.assertIn("Short version", post["coffee_html"])
         self.assertNotIn("Short version", post["content_html"])
         self.assertIn("Long version", post["content_html"])
+
+
+class NotionAboutSyncTests(unittest.TestCase):
+    ABOUT_ID = "a1234567-b89c-4d01-9234-56789abcdef0"
+    ARTICLE_ID = "b1234567-b89c-4d01-9234-56789abcdef0"
+
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
+        (self.root / "content/posts").mkdir(parents=True)
+        self.about_path = self.root / "content/about.html"
+        self.old_post = self.root / "content/posts/notion-previous.json"
+        self.about_path.write_text("<p>Saved biography.</p>\n")
+        self.old_post.write_text("previous generated article\n")
+        self.save_config({"notion_about_page_id": self.ABOUT_ID})
+        for name, value in (("ROOT", self.root), ("TOKEN", "test-token"),
+                            ("DATA_SOURCE_ID", "test-data-source")):
+            patcher = patch.object(notion, name, value)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        self.log = io.StringIO()
+        output = patch("sys.stdout", self.log)
+        output.start()
+        self.addCleanup(output.stop)
+
+    def save_config(self, values):
+        (self.root / "site.json").write_text(json.dumps(values))
+
+    def page(self, page_id, title="An article", status="Published"):
+        return {
+            "object": "page", "id": page_id, "archived": False, "in_trash": False,
+            "created_time": "2026-10-01T00:00:00Z", "last_edited_time": "2026-10-01T01:00:00Z",
+            "properties": {
+                "Title": {"type": "title", "title": [{"plain_text": title}]},
+                "Status": {"type": "status", "status": {"name": status}},
+            },
+        }
+
+    def paragraph(self, text):
+        return [{"type": "paragraph", "paragraph": {"rich_text": [{"plain_text": text}]}}]
+
+    def assert_saved_content_unchanged(self):
+        self.assertEqual(self.about_path.read_text(), "<p>Saved biography.</p>\n")
+        self.assertEqual(self.old_post.read_text(), "previous generated article\n")
+
+    def test_about_body_syncs_with_formatting_and_never_exports_as_an_article(self):
+        configured_id = self.ABOUT_ID.replace("-", "").upper()
+        self.save_config({"notion_about_page_id": configured_id})
+        blocks = [{"type": "paragraph", "paragraph": {"rich_text": [
+            {"plain_text": "Useful systems", "annotations": {"bold": True}},
+            {"plain_text": " & "},
+            {"plain_text": "my work", "href": "https://example.com/?a=1&b=2"},
+        ]}}]
+        for status in ("Draft", "Published"):
+            with self.subTest(status=status):
+                about = self.page(self.ABOUT_ID, "About Me", status)
+                article = self.page(self.ARTICLE_ID)
+                with patch.object(notion, "request", return_value=about) as request, \
+                        patch.object(notion, "paginated", return_value=[about, article]), \
+                        patch.object(notion, "block_children", side_effect=[blocks, self.paragraph("Article body.")]) as children:
+                    notion.main()
+                request.assert_called_once_with(f"/pages/{configured_id}")
+                self.assertEqual(children.call_count, 2)
+                self.assertEqual(self.about_path.read_text(),
+                                 '<p><strong>Useful systems</strong> &amp; '
+                                 '<a href="https://example.com/?a=1&amp;b=2" rel="noreferrer">my work</a></p>\n')
+                posts = list((self.root / "content/posts").glob("notion-*.json"))
+                self.assertEqual(len(posts), 1)
+                self.assertEqual(json.loads(posts[0].read_text())["notion_page_id"], self.ARTICLE_ID)
+                self.assertIn("Synced About Me from Notion.", self.log.getvalue())
+
+    def test_inaccessible_about_fails_without_replacing_local_content(self):
+        with patch.object(notion, "request", side_effect=RuntimeError("Notion API 404")), \
+                patch.object(notion, "paginated") as query:
+            with self.assertRaisesRegex(RuntimeError, "Notion API 404"):
+                notion.main()
+        query.assert_not_called()
+        self.assert_saved_content_unchanged()
+
+    def test_biography_heading_ids_do_not_collide_with_homepage_sections(self):
+        blocks = [{"id": "heading-block", "type": "heading_2", "heading_2": {
+            "rich_text": [{"plain_text": "Archive"}],
+        }}]
+        with patch.object(notion, "request", return_value=self.page(self.ABOUT_ID)), \
+                patch.object(notion, "block_children", return_value=blocks):
+            biography = notion.read_about(self.ABOUT_ID)
+        self.assertEqual(biography, '<h2 id="about-content-archive">Archive</h2>')
+        self.assertEqual(notion.render_blocks(blocks, self.ARTICLE_ID),
+                         '<h2 id="archive">Archive</h2>')
+        config = json.loads((ROOT / "site.json").read_text())
+        original_load = build.load
+        with patch.object(build, "load", side_effect=lambda path:
+                          biography if path == ROOT / "content/about.html" else original_load(path)), \
+                patch.object(build, "write_page") as write:
+            build.build_about(config, [])
+        homepage = write.call_args_list[0].args[1]
+        self.assertEqual(homepage.count('id="archive"'), 1)
+        self.assertEqual(homepage.count('id="about-content-archive"'), 1)
+
+    def test_archived_or_trashed_about_fails_without_replacing_local_content(self):
+        for flag in ("archived", "in_trash"):
+            with self.subTest(flag=flag):
+                about = self.page(self.ABOUT_ID)
+                about[flag] = True
+                with patch.object(notion, "request", return_value=about), \
+                        patch.object(notion, "block_children") as children:
+                    with self.assertRaisesRegex(RuntimeError, "unavailable or archived"):
+                        notion.main()
+                children.assert_not_called()
+                self.assert_saved_content_unchanged()
+
+    def test_empty_about_fails_instead_of_silently_reusing_saved_biography(self):
+        for blocks in ([], self.paragraph(" \n "), [{"type": "unsupported"}]):
+            with self.subTest(blocks=blocks), \
+                    patch.object(notion, "request", return_value=self.page(self.ABOUT_ID)), \
+                    patch.object(notion, "block_children", return_value=blocks), \
+                    patch.object(notion, "paginated") as query:
+                with self.assertRaisesRegex(RuntimeError, "no readable body text"):
+                    notion.main()
+                query.assert_not_called()
+                self.assert_saved_content_unchanged()
+
+    def test_invalid_about_id_fails_before_network_or_content_changes(self):
+        for invalid in (123, "https://notion.so/a-page", "../../other-page", "not-a-page-id"):
+            with self.subTest(page_id=invalid):
+                self.save_config({"notion_about_page_id": invalid})
+                with patch.object(notion, "request") as request:
+                    with self.assertRaisesRegex(ValueError, "notion_about_page_id"):
+                        notion.main()
+                request.assert_not_called()
+                self.assert_saved_content_unchanged()
+
+    def test_article_read_failure_also_preserves_the_biography_and_old_articles(self):
+        with patch.object(notion, "request", return_value=self.page(self.ABOUT_ID)), \
+                patch.object(notion, "paginated", return_value=[self.page(self.ARTICLE_ID)]), \
+                patch.object(notion, "block_children", side_effect=[self.paragraph("Updated biography."), RuntimeError("Article access failed")]):
+            with self.assertRaisesRegex(RuntimeError, "Article access failed"):
+                notion.main()
+        self.assert_saved_content_unchanged()
+
+    def test_missing_about_configuration_preserves_legacy_article_only_sync(self):
+        for config in ({}, {"notion_about_page_id": ""}):
+            with self.subTest(config=config):
+                self.save_config(config)
+                with patch.object(notion, "request") as request, \
+                        patch.object(notion, "paginated", return_value=[self.page(self.ARTICLE_ID)]), \
+                        patch.object(notion, "block_children", return_value=self.paragraph("Article body.")):
+                    notion.main()
+                request.assert_not_called()
+                self.assertEqual(self.about_path.read_text(), "<p>Saved biography.</p>\n")
+                posts = list((self.root / "content/posts").glob("notion-*.json"))
+                self.assertEqual(len(posts), 1)
+                self.assertEqual(json.loads(posts[0].read_text())["notion_page_id"], self.ARTICLE_ID)
+
+    def test_missing_credentials_retains_all_local_fallback_content(self):
+        with patch.object(notion, "TOKEN", ""), patch.object(notion, "request") as request, \
+                patch.object(notion, "paginated") as query:
+            notion.main()
+        request.assert_not_called()
+        query.assert_not_called()
+        self.assert_saved_content_unchanged()
 
 
 if __name__ == "__main__":

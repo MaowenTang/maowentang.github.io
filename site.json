@@ -1,9 +1,9 @@
 {
-  "title": "Andrea Tang",
+  "title": "Maowen Tang",
   "tagline": "I’m finding the work that fits how I think—while expanding my skills, perspective, and range until one piece becomes many.",
-  "description": "A Piece in Progress — Maowen Andrea Tang's writing on technology, growth, and finding the work that fits.",
-  "author": "Andrea Tang",
-  "profile_name": "Maowen “Andrea” Tang",
+  "description": "A Piece in Progress — Maowen Tang's writing on technology, growth, and finding the work that fits.",
+  "author": "Maowen Tang",
+  "profile_name": "Maowen Tang",
   "profile_focus": "Artificial intelligence, machine learning, and useful systems.",
   "language": "en",
   "base_url": "https://maowentang.github.io",
@@ -11,7 +11,14 @@
   "linkedin_url": "https://www.linkedin.com/in/maowen-tang-7836052b0",
   "email": "",
   "nav": [
-    {"label": "About", "url": "/#about"},
-    {"label": "Archive", "url": "/#archive"}
-  ]
+    {
+      "label": "About",
+      "url": "/#about"
+    },
+    {
+      "label": "Archive",
+      "url": "/#archive"
+    }
+  ],
+  "notion_about_page_id": "3ec86f31-679a-80dc-bce6-c8479891d6a5"
 }
