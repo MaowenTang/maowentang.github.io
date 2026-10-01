@@ -48,11 +48,13 @@ def reading_time(markup: str) -> int:
 
 
 def nav_html(config: dict, current: str) -> str:
+    if current == "/about/":
+        current = "/"
+    elif current.startswith(("/posts/", "/tags/")):
+        current = "/writing/"
     links = []
     for item in config["nav"]:
-        active = current == item["url"] or (
-            item["url"] == "/" and current.startswith("/posts/")
-        )
+        active = current == item["url"]
         aria = ' aria-current="page"' if active else ""
         links.append(
             f'<a href="{html.escape(item["url"], quote=True)}"{aria}>'
@@ -132,13 +134,14 @@ def tags_html(tags: list[str]) -> str:
     return f'<div class="tags">{links}</div>'
 
 
-def build_home(config: dict, posts: list[dict]) -> None:
+def build_writing(config: dict, posts: list[dict]) -> None:
     body = render(load(ROOT / "templates/home.html"), {
         "tagline": html.escape(config["tagline"]),
         "post_list": "".join(post_card(post) for post in posts),
     })
-    write_page("/index.html", base_page(
-        config, body, page_title=config["title"], description=config["description"], path="/"
+    write_page("/writing/", base_page(
+        config, body, page_title=f'Writing — {config["title"]}',
+        description=config["description"], path="/writing/"
     ))
 
 
@@ -218,14 +221,23 @@ def build_archive(config: dict, posts: list[dict]) -> None:
 
 
 def build_about(config: dict) -> None:
-    body = render(load(ROOT / "templates/page.html"), {
-        "heading": "About",
-        "page_content": load(ROOT / "content/about.html"),
+    profile_links = "".join(
+        f'<a href="{html.escape(config[key], quote=True)}" rel="noreferrer">{label}</a>'
+        for key, label in (("linkedin_url", "LinkedIn"), ("github_url", "GitHub"))
+        if config.get(key)
+    )
+    body = render(load(ROOT / "templates/about.html"), {
+        "profile_name": html.escape(config["profile_name"]),
+        "profile_focus": html.escape(config["profile_focus"]),
+        "profile_links": profile_links,
+        "about_content": load(ROOT / "content/about.html"),
     })
-    write_page("/about/", base_page(
-        config, body, page_title=f'About — {config["title"]}',
-        description=f'About {config["author"]}.', path="/about/"
-    ))
+    page = base_page(
+        config, body, page_title=config["title"],
+        description=f'About {config["profile_name"]}. {config["profile_focus"]}', path="/"
+    )
+    write_page("/index.html", page)
+    write_page("/about/", page)
 
 
 def build_tags(config: dict, posts: list[dict]) -> None:
@@ -268,7 +280,7 @@ def build_machine_files(config: dict, posts: list[dict]) -> None:
     )
     (DIST / "feed.xml").write_text(rss, encoding="utf-8")
 
-    paths = ["/", "/archive/", "/about/"] + [f'/posts/{p["slug"]}/' for p in posts]
+    paths = ["/", "/writing/", "/archive/"] + [f'/posts/{p["slug"]}/' for p in posts]
     sitemap = '<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' + "".join(
         f'<url><loc>{config["base_url"]}{path}</loc></url>' for path in paths
     ) + "</urlset>"
@@ -295,10 +307,10 @@ def main() -> None:
     notion_assets = ROOT / "static/notion"
     if notion_assets.exists():
         shutil.copytree(notion_assets, DIST / "assets/notion", dirs_exist_ok=True)
-    build_home(config, posts)
+    build_about(config)
+    build_writing(config, posts)
     build_posts(config, posts)
     build_archive(config, posts)
-    build_about(config)
     build_tags(config, posts)
     build_machine_files(config, posts)
     print(f"Built {len(posts)} post(s) into {DIST}")

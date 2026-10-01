@@ -12,6 +12,14 @@ python3 -m http.server 8000 --directory dist
 
 Open `http://localhost:8000`.
 
+## Pages and profile
+
+The homepage is About, with profile text and LinkedIn/GitHub links configured in
+`site.json` and biography paragraphs in `content/about.html`. The existing
+`/about/` address remains available and points search engines to the homepage.
+Writing lives at `/writing/`, with the chronological archive at `/archive/`.
+Published article addresses and RSS links stay unchanged.
+
 ## Presentation and motion
 
 The site uses a white, text-only layout with persistent desktop navigation and

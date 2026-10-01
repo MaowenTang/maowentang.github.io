@@ -1,9 +1,13 @@
 import importlib.util
+import html
+from html.parser import HTMLParser
 import json
 import subprocess
 import sys
 import unittest
 from pathlib import Path
+from unittest.mock import patch
+import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -19,6 +23,21 @@ build = load_module("site_build", "scripts/build.py")
 notion = load_module("notion_sync", "scripts/sync_notion.py")
 
 
+class PageLinks(HTMLParser):
+    def __init__(self, markup):
+        super().__init__()
+        self.current = []
+        self.canonical = None
+        self.feed(markup)
+
+    def handle_starttag(self, tag, attributes):
+        attrs = dict(attributes)
+        if tag == "a" and attrs.get("aria-current") == "page":
+            self.current.append(attrs.get("href"))
+        if tag == "link" and attrs.get("rel") == "canonical":
+            self.canonical = attrs.get("href")
+
+
 class BuildTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -26,7 +45,7 @@ class BuildTests(unittest.TestCase):
 
     def test_expected_pages_and_metadata_exist(self):
         expected = [
-            "index.html", "about/index.html", "archive/index.html",
+            "index.html", "about/index.html", "writing/index.html", "archive/index.html",
             "favicon.ico", "feed.xml", "sitemap.xml", "search.json",
         ]
         for relative in expected:
@@ -34,6 +53,68 @@ class BuildTests(unittest.TestCase):
         homepage = (ROOT / "dist/index.html").read_text()
         self.assertIn("Andrea Tang", homepage)
         self.assertIn('rel="canonical"', homepage)
+
+    def test_about_is_home_and_writing_has_its_own_address(self):
+        config = json.loads((ROOT / "site.json").read_text())
+        homepage = (ROOT / "dist/index.html").read_text()
+        about_alias = (ROOT / "dist/about/index.html").read_text()
+        writing = (ROOT / "dist/writing/index.html").read_text()
+        self.assertIn(html.escape(config["profile_name"]), homepage)
+        self.assertIn((ROOT / "content/about.html").read_text(), homepage)
+        self.assertEqual(homepage, about_alias)
+        self.assertEqual(PageLinks(homepage).canonical, config["base_url"] + "/")
+        self.assertEqual(PageLinks(writing).canonical, config["base_url"] + "/writing/")
+        self.assertIn("A Piece", writing)
+        self.assertNotIn("A Piece<br>", homepage)
+        for post in build.load_posts():
+            self.assertIn(html.escape(post["title"]), writing)
+
+    def test_navigation_tracks_about_writing_archive_and_articles(self):
+        expected = {
+            "index.html": "/", "about/index.html": "/",
+            "writing/index.html": "/writing/", "archive/index.html": "/archive/",
+        }
+        for directory in ("posts", "tags"):
+            for path in (ROOT / "dist" / directory).glob("*/index.html"):
+                expected[str(path.relative_to(ROOT / "dist"))] = "/writing/"
+        for path, active in expected.items():
+            with self.subTest(path=path):
+                markup = (ROOT / "dist" / path).read_text()
+                self.assertEqual(PageLinks(markup).current, [active])
+
+    def test_article_return_links_go_to_writing(self):
+        for post in build.load_posts():
+            markup = (ROOT / "dist/posts" / post["slug"] / "index.html").read_text()
+            self.assertIn('<a class="back-link" href="/writing/">← Writing</a>', markup)
+            self.assertIn('<a href="/writing/">More writing →</a>', markup)
+
+    def test_sitemap_lists_canonical_pages_and_rss_keeps_article_urls(self):
+        config = json.loads((ROOT / "site.json").read_text())
+        base_url = config["base_url"]
+        sitemap = ET.parse(ROOT / "dist/sitemap.xml")
+        urls = [node.text for node in sitemap.findall(".//{*}loc")]
+        self.assertIn(base_url + "/", urls)
+        self.assertIn(base_url + "/writing/", urls)
+        self.assertIn(base_url + "/archive/", urls)
+        self.assertNotIn(base_url + "/about/", urls)
+        expected_posts = [f'{base_url}/posts/{post["slug"]}/' for post in build.load_posts()]
+        self.assertTrue(set(expected_posts).issubset(urls))
+        rss = ET.parse(ROOT / "dist/feed.xml")
+        self.assertEqual([node.text for node in rss.findall("./channel/item/link")], expected_posts)
+
+    def test_profile_configuration_is_escaped_in_html(self):
+        config = json.loads((ROOT / "site.json").read_text())
+        config.update({
+            "profile_name": '<Name & "Alias">', "profile_focus": "Research < learning",
+            "linkedin_url": 'https://example.com/?name="Alias"&topic=<research>',
+        })
+        with patch.object(build, "write_page") as write:
+            build.build_about(config)
+        markup = write.call_args_list[0].args[1]
+        self.assertIn(html.escape(config["profile_name"]), markup)
+        self.assertIn(html.escape(config["profile_focus"]), markup)
+        self.assertIn(f'href="{html.escape(config["linkedin_url"], quote=True)}"', markup)
+        self.assertNotIn(config["profile_name"], markup)
 
     def test_search_index_matches_generated_post_pages(self):
         data = json.loads((ROOT / "dist/search.json").read_text())

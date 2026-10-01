@@ -306,7 +306,7 @@
   });
 
   if (!location.hash && !initialScroll?.y) {
-    [...document.querySelectorAll(".intro, .section-heading, .post-card, .page-head, .article-header, .archive-row")]
+    [...document.querySelectorAll(".intro, .section-heading, .post-card, .page-head, .profile-about, .article-header, .archive-row")]
       .filter((element) => element.getBoundingClientRect().top < innerHeight)
       .slice(0, 8)
       .forEach((element, index) => {
