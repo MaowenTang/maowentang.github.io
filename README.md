@@ -14,11 +14,12 @@ Open `http://localhost:8000`.
 
 ## Pages and profile
 
-The homepage is About, with profile text and LinkedIn/GitHub links configured in
-`site.json` and biography paragraphs in `content/about.html`. The existing
-`/about/` address remains available and points search engines to the homepage.
-Writing lives at `/writing/`, with the chronological archive at `/archive/`.
-Published article addresses and RSS links stay unchanged.
+The homepage starts with About and continues directly into the chronological
+Archive. Navigation links scroll to `/#about` and `/#archive`; there is no
+separate Writing page. Profile text and LinkedIn/GitHub links are configured in
+`site.json`, with biography paragraphs in `content/about.html`. The existing
+`/about/` and `/archive/` addresses remain available and point search engines to
+the homepage. Published article addresses and RSS links stay unchanged.
 
 ## Presentation and motion
 

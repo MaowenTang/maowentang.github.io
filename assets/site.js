@@ -15,6 +15,7 @@
   let renderedURL = new URL(location.href);
   let currentKey;
   let tocLinks = [];
+  let pageSections = [];
   let scrollFrame = 0;
   let scrollSaveTimer = 0;
   let lastScrollSave = -Infinity;
@@ -72,6 +73,24 @@
     return ++navigation;
   }
 
+  function updateSectionNavigation() {
+    const sections = pageSections.filter((section) => section.getClientRects().length);
+    if (!sections.length) return;
+    const threshold = Math.min(300, Math.max(160, innerHeight * 0.35));
+    let active = sections[0];
+    sections.forEach((section) => {
+      if (section.getBoundingClientRect().top <= threshold) active = section;
+    });
+    const last = sections[sections.length - 1];
+    const lastBounds = last.getBoundingClientRect();
+    const atBottom = scrollY > 1 && scrollY + innerHeight >= document.documentElement.scrollHeight - 2;
+    if (atBottom && lastBounds.top < innerHeight && lastBounds.bottom > 0) active = last;
+    document.querySelectorAll(".nav a").forEach((link) => {
+      if (hashTarget(link.hash) === active) link.setAttribute("aria-current", "location");
+      else link.removeAttribute("aria-current");
+    });
+  }
+
   function updateTOC() {
     scrollFrame = 0;
     const visible = tocLinks.filter(({ link, target }) => link.getClientRects().length && target?.getClientRects().length);
@@ -83,9 +102,11 @@
       if (link === active?.link) link.setAttribute("aria-current", "location");
       else link.removeAttribute("aria-current");
     });
+    updateSectionNavigation();
   }
 
   function initializeContent() {
+    pageSections = [...document.querySelectorAll("[data-page-section][id]")];
     const tabs = [...document.querySelectorAll("[data-reading-mode]")];
     const panels = [...document.querySelectorAll("[data-reading-panel]")];
     const panelAnimations = new Set();
@@ -149,6 +170,7 @@
       setMode(tabs.some((tab) => tab.dataset.readingMode === preferred) ? preferred : tabs[0].dataset.readingMode);
     }
     updateTOC();
+    requestAnimationFrame(updateTOC);
   }
 
   function updatePageDetails(nextDocument) {
@@ -298,6 +320,9 @@
     if (!scrollFrame) scrollFrame = requestAnimationFrame(updateTOC);
   }, { passive: true });
   window.addEventListener("scrollend", persistScroll);
+  window.addEventListener("resize", () => {
+    if (!scrollFrame) scrollFrame = requestAnimationFrame(updateTOC);
+  });
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "hidden") saveScroll();
   });

@@ -11,8 +11,7 @@
   "linkedin_url": "https://www.linkedin.com/in/maowen-tang-7836052b0",
   "email": "",
   "nav": [
-    {"label": "About", "url": "/"},
-    {"label": "Writing", "url": "/writing/"},
-    {"label": "Archive", "url": "/archive/"}
+    {"label": "About", "url": "/#about"},
+    {"label": "Archive", "url": "/#archive"}
   ]
 }

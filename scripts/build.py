@@ -48,10 +48,10 @@ def reading_time(markup: str) -> int:
 
 
 def nav_html(config: dict, current: str) -> str:
-    if current == "/about/":
-        current = "/"
-    elif current.startswith(("/posts/", "/tags/")):
-        current = "/writing/"
+    if current in {"/", "/about/"}:
+        current = "/#about"
+    elif current == "/archive/" or current.startswith(("/posts/", "/tags/")):
+        current = "/#archive"
     links = []
     for item in config["nav"]:
         active = current == item["url"]
@@ -64,8 +64,8 @@ def nav_html(config: dict, current: str) -> str:
 
 
 def base_page(config: dict, body: str, *, page_title: str, description: str,
-              path: str, og_type: str = "website") -> str:
-    canonical = config["base_url"].rstrip("/") + path
+              path: str, og_type: str = "website", canonical_path: str | None = None) -> str:
+    canonical = config["base_url"].rstrip("/") + (canonical_path or path)
     return render(load(ROOT / "templates/base.html"), {
         **config,
         "page_title": html.escape(page_title),
@@ -134,17 +134,6 @@ def tags_html(tags: list[str]) -> str:
     return f'<div class="tags">{links}</div>'
 
 
-def build_writing(config: dict, posts: list[dict]) -> None:
-    body = render(load(ROOT / "templates/home.html"), {
-        "tagline": html.escape(config["tagline"]),
-        "post_list": "".join(post_card(post) for post in posts),
-    })
-    write_page("/writing/", base_page(
-        config, body, page_title=f'Writing — {config["title"]}',
-        description=config["description"], path="/writing/"
-    ))
-
-
 def reading_experience(post: dict) -> tuple[str, int]:
     long_content = post["content_html"]
     coffee_content = post.get("coffee_html", "").strip()
@@ -200,27 +189,35 @@ def build_posts(config: dict, posts: list[dict]) -> None:
         ))
 
 
-def build_archive(config: dict, posts: list[dict]) -> None:
+def render_archive(posts: list[dict], standalone: bool = False) -> str:
     chunks: list[str] = []
     active_year = None
+    year_tag = "h2" if standalone else "h3"
     for post in posts:
         date = date_value(post["published_at"])
         if date.year != active_year:
             active_year = date.year
-            chunks.append(f'<h2 class="archive-year">{active_year}</h2>')
+            chunks.append(f'<{year_tag} class="archive-year">{active_year}</{year_tag}>')
         chunks.append(
             f'<a class="archive-row" href="/posts/{post["slug"]}/">'
             f'<time datetime="{date.isoformat()}">{date.strftime("%b %-d")}</time>'
             f'<strong>{html.escape(post["title"])}</strong></a>'
         )
-    body = render(load(ROOT / "templates/archive.html"), {"archive_rows": "".join(chunks)})
+    return render(load(ROOT / "templates/archive.html"), {
+        "archive_heading_tag": "h1" if standalone else "h2",
+        "archive_rows": "".join(chunks),
+    })
+
+
+def build_archive(config: dict, posts: list[dict]) -> None:
+    body = render_archive(posts, standalone=True)
     write_page("/archive/", base_page(
         config, body, page_title=f'Archive — {config["title"]}',
-        description="All writing by Andrea Tang.", path="/archive/"
+        description="All writing by Andrea Tang.", path="/archive/", canonical_path="/"
     ))
 
 
-def build_about(config: dict) -> None:
+def build_about(config: dict, posts: list[dict]) -> None:
     profile_links = "".join(
         f'<a href="{html.escape(config[key], quote=True)}" rel="noreferrer">{label}</a>'
         for key, label in (("linkedin_url", "LinkedIn"), ("github_url", "GitHub"))
@@ -231,6 +228,7 @@ def build_about(config: dict) -> None:
         "profile_focus": html.escape(config["profile_focus"]),
         "profile_links": profile_links,
         "about_content": load(ROOT / "content/about.html"),
+        "archive_content": render_archive(posts),
     })
     page = base_page(
         config, body, page_title=config["title"],
@@ -280,7 +278,7 @@ def build_machine_files(config: dict, posts: list[dict]) -> None:
     )
     (DIST / "feed.xml").write_text(rss, encoding="utf-8")
 
-    paths = ["/", "/writing/", "/archive/"] + [f'/posts/{p["slug"]}/' for p in posts]
+    paths = ["/"] + [f'/posts/{p["slug"]}/' for p in posts]
     sitemap = '<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' + "".join(
         f'<url><loc>{config["base_url"]}{path}</loc></url>' for path in paths
     ) + "</urlset>"
@@ -307,8 +305,7 @@ def main() -> None:
     notion_assets = ROOT / "static/notion"
     if notion_assets.exists():
         shutil.copytree(notion_assets, DIST / "assets/notion", dirs_exist_ok=True)
-    build_about(config)
-    build_writing(config, posts)
+    build_about(config, posts)
     build_posts(config, posts)
     build_archive(config, posts)
     build_tags(config, posts)

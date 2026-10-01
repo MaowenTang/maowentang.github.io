@@ -28,14 +28,30 @@ class PageLinks(HTMLParser):
         super().__init__()
         self.current = []
         self.canonical = None
+        self.section_ids = []
+        self.heading_tags = []
+        self.navigation_links = []
+        self.in_navigation = False
         self.feed(markup)
 
     def handle_starttag(self, tag, attributes):
         attrs = dict(attributes)
+        if tag == "nav" and attrs.get("aria-label") == "Primary navigation":
+            self.in_navigation = True
+        if tag == "a" and self.in_navigation:
+            self.navigation_links.append(attrs.get("href"))
         if tag == "a" and attrs.get("aria-current") == "page":
             self.current.append(attrs.get("href"))
         if tag == "link" and attrs.get("rel") == "canonical":
             self.canonical = attrs.get("href")
+        if "data-page-section" in attrs:
+            self.section_ids.append(attrs.get("id"))
+        if tag in {"h1", "h2", "h3"}:
+            self.heading_tags.append(tag)
+
+    def handle_endtag(self, tag):
+        if tag == "nav":
+            self.in_navigation = False
 
 
 class BuildTests(unittest.TestCase):
@@ -45,7 +61,7 @@ class BuildTests(unittest.TestCase):
 
     def test_expected_pages_and_metadata_exist(self):
         expected = [
-            "index.html", "about/index.html", "writing/index.html", "archive/index.html",
+            "index.html", "about/index.html", "archive/index.html",
             "favicon.ico", "feed.xml", "sitemap.xml", "search.json",
         ]
         for relative in expected:
@@ -54,39 +70,49 @@ class BuildTests(unittest.TestCase):
         self.assertIn("Andrea Tang", homepage)
         self.assertIn('rel="canonical"', homepage)
 
-    def test_about_is_home_and_writing_has_its_own_address(self):
+    def test_home_flows_from_about_to_archive_without_a_writing_page(self):
         config = json.loads((ROOT / "site.json").read_text())
         homepage = (ROOT / "dist/index.html").read_text()
         about_alias = (ROOT / "dist/about/index.html").read_text()
-        writing = (ROOT / "dist/writing/index.html").read_text()
+        archive = (ROOT / "dist/archive/index.html").read_text()
         self.assertIn(html.escape(config["profile_name"]), homepage)
         self.assertIn((ROOT / "content/about.html").read_text(), homepage)
         self.assertEqual(homepage, about_alias)
-        self.assertEqual(PageLinks(homepage).canonical, config["base_url"] + "/")
-        self.assertEqual(PageLinks(writing).canonical, config["base_url"] + "/writing/")
-        self.assertIn("A Piece", writing)
-        self.assertNotIn("A Piece<br>", homepage)
+        for markup in (homepage, about_alias, archive):
+            self.assertEqual(PageLinks(markup).canonical, config["base_url"] + "/")
+            self.assertEqual(PageLinks(markup).heading_tags.count("h1"), 1)
+        self.assertEqual(PageLinks(homepage).section_ids, ["about", "archive"])
+        self.assertEqual(PageLinks(archive).section_ids, ["archive"])
+        self.assertEqual(homepage.count('id="about"'), 1)
+        self.assertEqual(homepage.count('id="archive"'), 1)
+        self.assertFalse((ROOT / "dist/writing").exists())
         for post in build.load_posts():
-            self.assertIn(html.escape(post["title"]), writing)
+            for markup in (homepage, archive):
+                self.assertIn(html.escape(post["title"]), markup)
+                self.assertIn(f'href="/posts/{post["slug"]}/"', markup)
 
-    def test_navigation_tracks_about_writing_archive_and_articles(self):
+    def test_navigation_tracks_about_archive_and_articles(self):
         expected = {
-            "index.html": "/", "about/index.html": "/",
-            "writing/index.html": "/writing/", "archive/index.html": "/archive/",
+            "index.html": "/#about", "about/index.html": "/#about",
+            "archive/index.html": "/#archive",
         }
         for directory in ("posts", "tags"):
             for path in (ROOT / "dist" / directory).glob("*/index.html"):
-                expected[str(path.relative_to(ROOT / "dist"))] = "/writing/"
+                expected[str(path.relative_to(ROOT / "dist"))] = "/#archive"
         for path, active in expected.items():
             with self.subTest(path=path):
                 markup = (ROOT / "dist" / path).read_text()
                 self.assertEqual(PageLinks(markup).current, [active])
+                self.assertEqual(PageLinks(markup).navigation_links, ["/#about", "/#archive"])
+                self.assertIn('href="/#about"', markup)
+                self.assertIn('href="/#archive"', markup)
+                self.assertNotIn('href="/writing/"', markup)
 
-    def test_article_return_links_go_to_writing(self):
+    def test_article_return_links_go_to_the_homepage_archive(self):
         for post in build.load_posts():
             markup = (ROOT / "dist/posts" / post["slug"] / "index.html").read_text()
-            self.assertIn('<a class="back-link" href="/writing/">← Writing</a>', markup)
-            self.assertIn('<a href="/writing/">More writing →</a>', markup)
+            self.assertIn('<a class="back-link" href="/#archive">← Archive</a>', markup)
+            self.assertIn('<a href="/#archive">Back to archive →</a>', markup)
 
     def test_sitemap_lists_canonical_pages_and_rss_keeps_article_urls(self):
         config = json.loads((ROOT / "site.json").read_text())
@@ -94,11 +120,11 @@ class BuildTests(unittest.TestCase):
         sitemap = ET.parse(ROOT / "dist/sitemap.xml")
         urls = [node.text for node in sitemap.findall(".//{*}loc")]
         self.assertIn(base_url + "/", urls)
-        self.assertIn(base_url + "/writing/", urls)
-        self.assertIn(base_url + "/archive/", urls)
+        self.assertNotIn(base_url + "/writing/", urls)
+        self.assertNotIn(base_url + "/archive/", urls)
         self.assertNotIn(base_url + "/about/", urls)
         expected_posts = [f'{base_url}/posts/{post["slug"]}/' for post in build.load_posts()]
-        self.assertTrue(set(expected_posts).issubset(urls))
+        self.assertEqual(urls, [base_url + "/"] + expected_posts)
         rss = ET.parse(ROOT / "dist/feed.xml")
         self.assertEqual([node.text for node in rss.findall("./channel/item/link")], expected_posts)
 
@@ -109,7 +135,7 @@ class BuildTests(unittest.TestCase):
             "linkedin_url": 'https://example.com/?name="Alias"&topic=<research>',
         })
         with patch.object(build, "write_page") as write:
-            build.build_about(config)
+            build.build_about(config, build.load_posts())
         markup = write.call_args_list[0].args[1]
         self.assertIn(html.escape(config["profile_name"]), markup)
         self.assertIn(html.escape(config["profile_focus"]), markup)
