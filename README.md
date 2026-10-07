@@ -24,6 +24,14 @@ fallback when previewing without Notion credentials. The existing
 `/about/` and `/archive/` addresses remain available and point search engines to
 the homepage. Published article addresses and RSS links stay unchanged.
 
+Archive supports tag and year filters plus keyword search across titles,
+summaries, and tags. The tag list and its counts are generated from each
+article's Notion `Tags` property; untagged articles remain available under
+**All** and **Untagged**. Edit those tags in Notion to organize future posts.
+The list retains year/month grouping, and filtering does not change article
+content or URLs. Without JavaScript, the complete list and tag links remain
+available.
+
 ## Presentation and motion
 
 The site uses a white, text-only layout with persistent desktop navigation and

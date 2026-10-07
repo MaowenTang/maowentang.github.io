@@ -10,6 +10,7 @@
   };
   const animations = new Set();
   const positions = new Map();
+  const archiveStates = new Map();
   let controller;
   let navigation = 0;
   let renderedURL = new URL(location.href);
@@ -20,6 +21,7 @@
   let scrollSaveTimer = 0;
   let lastScrollSave = -Infinity;
   let selectReadingMode;
+  let archiveUI;
 
   const entryKey = () => `${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const stateWith = (key, scroll) => ({ ...history.state, siteNavigation: { key, scroll } });
@@ -35,10 +37,15 @@
     scrollSaveTimer = 0;
     const scroll = scrollPosition();
     positions.set(currentKey, scroll);
-    if (history.state?.siteNavigation?.key === currentKey) {
+    const filters = archiveUI?.getState();
+    if (filters && currentKey) archiveStates.set(currentKey, filters);
+    if (currentKey && history.state?.siteNavigation?.key === currentKey) {
       const saved = history.state.siteNavigation.scroll;
-      if (saved?.x !== scroll.x || saved?.y !== scroll.y) {
-        history.replaceState(stateWith(currentKey, scroll), "");
+      const filtersChanged = filters && JSON.stringify(filters) !== JSON.stringify(history.state.archiveFilters);
+      if (saved?.x !== scroll.x || saved?.y !== scroll.y || filtersChanged) {
+        const nextState = stateWith(currentKey, scroll);
+        if (filters) nextState.archiveFilters = filters;
+        history.replaceState(nextState, "");
         lastScrollSave = performance.now();
       }
     }
@@ -105,8 +112,122 @@
     updateSectionNavigation();
   }
 
+  function normalizeArchiveQuery(value) {
+    return String(value || "").normalize("NFKC").toLowerCase().replace(/\s+/gu, " ").trim();
+  }
+
+  function matchesArchiveEntry(entry, filters, tokens) {
+    return (!filters.year || entry.year === filters.year)
+      && (filters.untagged ? entry.tags.length === 0 : !filters.tag || entry.tags.includes(filters.tag))
+      && tokens.every((token) => entry.search.includes(token));
+  }
+
+  function initializeArchive() {
+    archiveUI = null;
+    const archive = document.getElementById("archive");
+    const controls = archive?.querySelector("[data-archive-controls]");
+    const search = controls?.querySelector("[data-archive-search]");
+    const year = controls?.querySelector("[data-archive-year]");
+    if (!controls || !search || !year) return;
+    const tagButtons = [...controls.querySelectorAll("[data-archive-filter], [data-archive-untagged]")];
+    const reset = controls.querySelector("[data-archive-reset]");
+    const result = archive.querySelector("[data-archive-result]");
+    const empty = archive.querySelector("[data-archive-empty]");
+    const rows = [...archive.querySelectorAll("[data-archive-entry]")].map((element) => {
+      let tags;
+      try { tags = JSON.parse(element.dataset.tags || "[]"); } catch { tags = []; }
+      return { element, year: element.dataset.year, tags: Array.isArray(tags) ? tags : [], search: normalizeArchiveQuery(element.dataset.search) };
+    });
+    const groupSelector = "[data-archive-year-group], [data-archive-month-group]";
+    const groups = [...archive.querySelectorAll(groupSelector)].map((element) => ({
+      element,
+      rows: [...element.querySelectorAll("[data-archive-entry]")],
+      counts: [...element.querySelectorAll("[data-archive-group-count]")].filter((count) => count.closest(groupSelector) === element),
+    }));
+    let filters = { query: "", year: "", tag: "", untagged: false };
+
+    function apply(interactive = false) {
+      const before = controls.getBoundingClientRect();
+      const wasVisible = before.top < innerHeight && before.bottom > 0;
+      const query = normalizeArchiveQuery(filters.query);
+      const tokens = query ? query.split(" ") : [];
+      let count = 0;
+      rows.forEach((row) => {
+        row.element.hidden = !matchesArchiveEntry(row, filters, tokens);
+        if (!row.element.hidden) count += 1;
+      });
+      groups.forEach((group) => {
+        const visible = group.rows.filter((row) => !row.hidden).length;
+        group.element.hidden = visible === 0;
+        group.counts.forEach((label) => { label.textContent = String(visible); });
+      });
+      tagButtons.forEach((button) => {
+        const selected = button.hasAttribute("data-archive-untagged")
+          ? filters.untagged : !filters.untagged && button.dataset.archiveFilter === filters.tag;
+        button.setAttribute("aria-pressed", String(selected));
+      });
+      const active = Boolean(query || filters.year || filters.tag || filters.untagged);
+      if (reset) reset.hidden = !active;
+      if (result) result.textContent = active ? `${count} of ${rows.length} posts` : `${count} ${count === 1 ? "post" : "posts"}`;
+      if (empty) empty.hidden = count > 0 || rows.length === 0;
+      updateTOC();
+      if (interactive) {
+        if (currentKey) archiveStates.set(currentKey, { ...filters });
+        persistScroll();
+        if (wasVisible) requestAnimationFrame(() => {
+          if (!controls.isConnected) return;
+          const top = controls.getBoundingClientRect().top;
+          if (top >= innerHeight - 40 && top > before.top + 24) {
+            window.scrollBy({ top: Math.min(top - 120, innerHeight * 0.75), behavior: "instant" });
+          }
+        });
+      }
+    }
+
+    function restore(saved) {
+      const allowedYears = [...year.options].map((option) => option.value);
+      const allowedTags = tagButtons.filter((button) => button.hasAttribute("data-archive-filter")).map((button) => button.dataset.archiveFilter);
+      const untagged = saved?.untagged === true && tagButtons.some((button) => button.hasAttribute("data-archive-untagged"));
+      filters = {
+        query: typeof saved?.query === "string" ? saved.query : "",
+        year: allowedYears.includes(saved?.year) ? saved.year : "",
+        tag: !untagged && allowedTags.includes(saved?.tag) ? saved.tag : "",
+        untagged,
+      };
+      search.value = filters.query;
+      year.value = filters.year;
+      apply();
+    }
+
+    search.addEventListener("input", () => { filters.query = search.value; apply(true); });
+    search.addEventListener("blur", saveScroll);
+    year.addEventListener("change", () => { filters.year = year.value; apply(true); saveScroll(); });
+    controls.addEventListener("click", (event) => {
+      const button = event.target.closest?.("[data-archive-filter], [data-archive-untagged], [data-archive-reset]");
+      if (!button || !controls.contains(button)) return;
+      event.preventDefault();
+      if (button.hasAttribute("data-archive-reset")) {
+        restore();
+        search.focus({ preventScroll: true });
+      } else {
+        filters.untagged = button.hasAttribute("data-archive-untagged");
+        filters.tag = filters.untagged ? "" : button.dataset.archiveFilter;
+        apply(true);
+      }
+      saveScroll();
+    });
+    controls.addEventListener("submit", (event) => { event.preventDefault(); saveScroll(); });
+    search.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") { event.preventDefault(); saveScroll(); }
+    });
+    archiveUI = { getState: () => ({ ...filters }), restore };
+    controls.hidden = false;
+    restore(archiveStates.get(currentKey) || history.state?.archiveFilters);
+  }
+
   function initializeContent() {
     pageSections = [...document.querySelectorAll("[data-page-section][id]")];
+    initializeArchive();
     const tabs = [...document.querySelectorAll("[data-reading-mode]")];
     const panels = [...document.querySelectorAll("[data-reading-panel]")];
     const panelAnimations = new Set();
@@ -205,6 +326,15 @@
     updateTOC();
   }
 
+  function archiveFiltersForNavigation(url, hasArchive) {
+    const articleRoute = /^\/posts\/[^/]+\/?$/;
+    if (archiveUI && articleRoute.test(url.pathname)) return archiveUI.getState();
+    if (articleRoute.test(renderedURL.pathname) && hasArchive && (url.hash === "#archive" || url.pathname === "/archive/")) {
+      return history.state?.archiveFilters;
+    }
+    return null;
+  }
+
   async function navigate(url, { pop = false, state = null } = {}) {
     saveScroll();
     const request = stopNavigation();
@@ -214,6 +344,7 @@
       currentKey = saved?.key || entryKey();
       history.replaceState(stateWith(currentKey, position || scrollPosition()), "");
       renderedURL = url;
+      archiveUI?.restore(archiveStates.get(currentKey) || state?.archiveFilters);
       restorePosition(url, position, false);
       return;
     }
@@ -234,11 +365,16 @@
         duration: 140, easing: "ease-out", fill: "forwards",
       });
       if (request !== navigation) return;
+      saveScroll();
+      const carriedFilters = !pop && archiveFiltersForNavigation(finalURL, Boolean(nextDocument.getElementById("archive")));
       nextMain.tabIndex = -1;
       main.replaceWith(nextMain);
       updatePageDetails(nextDocument);
       currentKey = pop ? saved?.key || entryKey() : entryKey();
       const nextState = stateWith(currentKey, position || { x: 0, y: 0 });
+      if (pop && archiveStates.has(currentKey)) nextState.archiveFilters = archiveStates.get(currentKey);
+      else if (carriedFilters) nextState.archiveFilters = carriedFilters;
+      else if (!pop) delete nextState.archiveFilters;
       if (pop) history.replaceState(nextState, "", finalURL.href);
       else history.pushState(nextState, "", finalURL.href);
       renderedURL = finalURL;
