@@ -4,12 +4,13 @@
 from __future__ import annotations
 
 import datetime as dt
+import hashlib
 import html
 import json
 import re
 import shutil
+import unicodedata
 from pathlib import Path
-from urllib.parse import quote
 
 ROOT = Path(__file__).resolve().parents[1]
 DIST = ROOT / "dist"
@@ -126,10 +127,42 @@ def toc_for(markup: str) -> str:
     return "".join(rows)
 
 
+def normalized_tags(tags: list[str]) -> dict[str, str]:
+    labels: dict[str, str] = {}
+    for tag in tags:
+        label = " ".join(tag.split())
+        identity = label.casefold()
+        if identity:
+            labels[identity] = min(labels.get(identity, label), label)
+    return dict(sorted(labels.items()))
+
+
+def tag_path(tag: str) -> str:
+    identity = " ".join(tag.split()).casefold()
+    if re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", identity):
+        slug = identity
+    else:
+        stub = re.sub(r"[^a-z0-9]+", "-", identity).strip("-")[:40].rstrip("-") or "tag"
+        digest = hashlib.sha256(identity.encode("utf-8")).hexdigest()[:12]
+        # The double hyphen keeps hashed names separate from ordinary tag slugs.
+        slug = f"{stub}--{digest}"
+    return f"/tags/{slug}/"
+
+
+def tag_index(posts: list[dict]) -> dict[str, dict]:
+    groups: dict[str, dict] = {}
+    for post in posts:
+        for identity, label in normalized_tags(post["tags"]).items():
+            group = groups.setdefault(identity, {"label": label, "posts": []})
+            group["label"] = min(group["label"], label)
+            group["posts"].append(post)
+    return dict(sorted(groups.items()))
+
+
 def tags_html(tags: list[str]) -> str:
     links = "".join(
-        f'<a class="tag" href="/tags/{quote(tag.lower().replace(" ", "-"))}/">'
-        f'{html.escape(tag)}</a>' for tag in tags
+        f'<a class="tag" href="{tag_path(identity)}">{html.escape(label)}</a>'
+        for identity, label in normalized_tags(tags).items()
     )
     return f'<div class="tags">{links}</div>'
 
@@ -190,21 +223,74 @@ def build_posts(config: dict, posts: list[dict]) -> None:
 
 
 def render_archive(posts: list[dict], standalone: bool = False) -> str:
-    chunks: list[str] = []
-    active_year = None
-    year_tag = "h2" if standalone else "h3"
-    for post in posts:
+    ordered = sorted(posts, key=lambda post: post["published_at"], reverse=True)
+    by_year: dict[int, dict[int, list[dict]]] = {}
+    for post in ordered:
         date = date_value(post["published_at"])
-        if date.year != active_year:
-            active_year = date.year
-            chunks.append(f'<{year_tag} class="archive-year">{active_year}</{year_tag}>')
-        chunks.append(
-            f'<a class="archive-row" href="/posts/{post["slug"]}/">'
-            f'<time datetime="{date.isoformat()}">{date.strftime("%b %-d")}</time>'
-            f'<strong>{html.escape(post["title"])}</strong></a>'
+        by_year.setdefault(date.year, {}).setdefault(date.month, []).append(post)
+    tag_groups = tag_index(ordered)
+    untagged = sum(not normalized_tags(post["tags"]) for post in ordered)
+    filters = [
+        '<button class="archive-filter" type="button" data-archive-filter="" aria-pressed="true">'
+        f'All <span class="archive-filter-count" data-archive-filter-count>{len(ordered)}</span></button>'
+    ]
+    for identity, group in tag_groups.items():
+        filters.append(
+            f'<button class="archive-filter" type="button" data-archive-filter="{html.escape(identity, quote=True)}" aria-pressed="false">'
+            f'{html.escape(group["label"])} <span class="archive-filter-count" data-archive-filter-count>{len(group["posts"])}</span></button>'
         )
+    if untagged:
+        filters.append(
+            '<button class="archive-filter" type="button" data-archive-untagged aria-pressed="false">'
+            f'Untagged <span class="archive-filter-count" data-archive-filter-count>{untagged}</span></button>'
+        )
+    chunks: list[str] = []
+    year_level = 2 if standalone else 3
+    for year, months in by_year.items():
+        year_count = sum(len(month_posts) for month_posts in months.values())
+        chunks.append(
+            f'<section class="archive-year-group" data-archive-year-group="{year}">'
+            f'<h{year_level} class="archive-year">{year} '
+            f'<span class="archive-group-count" data-archive-group-count>{year_count}</span></h{year_level}>'
+        )
+        for month, month_posts in months.items():
+            month_key = f"{year}-{month:02d}"
+            month_name = dt.date(year, month, 1).strftime("%B")
+            chunks.append(
+                f'<section class="archive-month-group" data-archive-month-group="{month_key}">'
+                f'<h{year_level + 1} class="archive-month">{month_name} '
+                f'<span class="archive-group-count" data-archive-group-count>{len(month_posts)}</span></h{year_level + 1}>'
+            )
+            for post in month_posts:
+                date = date_value(post["published_at"])
+                labels = normalized_tags(post["tags"])
+                tag_values = html.escape(json.dumps(list(labels), ensure_ascii=False), quote=True)
+                search = " ".join(unicodedata.normalize(
+                    "NFKC", " ".join((post["title"], post["summary"], *labels.values()))
+                ).split()).lower()
+                topics = tags_html(post["tags"]) if labels else '<span class="archive-untagged">Untagged</span>'
+                chunks.append(
+                    f'<article class="archive-entry" data-archive-entry data-year="{year}" data-month="{month_key}" '
+                    f'data-tags="{tag_values}" data-search="{html.escape(search, quote=True)}">'
+                    f'<time class="archive-entry-date" datetime="{date.isoformat()}">{date.strftime("%B %-d")}</time>'
+                    '<div class="archive-entry-copy">'
+                    f'<h{year_level + 2} class="archive-entry-heading"><a class="archive-entry-title" href="/posts/{post["slug"]}/">'
+                    f'{html.escape(post["title"])}</a></h{year_level + 2}>'
+                    f'<p class="archive-entry-summary">{html.escape(post["summary"])}</p>{topics}</div></article>'
+                )
+            chunks.append("</section>")
+        chunks.append("</section>")
+    if not ordered:
+        chunks.append('<p class="archive-empty-source">No published articles yet.</p>')
+    year_options = "".join(
+        f'<option value="{year}">{year} ({sum(len(items) for items in months.values())})</option>'
+        for year, months in by_year.items()
+    )
     return render(load(ROOT / "templates/archive.html"), {
         "archive_heading_tag": "h1" if standalone else "h2",
+        "archive_tag_filters": "".join(filters),
+        "archive_year_options": year_options,
+        "archive_count": str(len(ordered)),
         "archive_rows": "".join(chunks),
     })
 
@@ -238,18 +324,14 @@ def build_about(config: dict, posts: list[dict]) -> None:
 
 
 def build_tags(config: dict, posts: list[dict]) -> None:
-    by_tag: dict[str, list[dict]] = {}
-    for post in posts:
-        for tag in post["tags"]:
-            by_tag.setdefault(tag, []).append(post)
-    for tag, tagged_posts in by_tag.items():
+    for identity, group in tag_index(posts).items():
+        tag = group["label"]
         body = (
             f'<section class="page-head"><p class="eyebrow">Topic</p><h1>{html.escape(tag)}</h1></section>'
             f'<section class="writing"><div class="post-list">'
-            f'{"".join(post_card(post) for post in tagged_posts)}</div></section>'
+            f'{"".join(post_card(post) for post in group["posts"])}</div></section>'
         )
-        slug = quote(tag.lower().replace(" ", "-"))
-        path = f"/tags/{slug}/"
+        path = tag_path(identity)
         write_page(path, base_page(
             config, body, page_title=f'{tag} — {config["title"]}',
             description=f'Writing about {tag}.', path=path

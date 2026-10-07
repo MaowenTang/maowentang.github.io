@@ -1,7 +1,30 @@
 <section id="archive" class="archive-section" data-page-section aria-labelledby="archive-heading">
   <header class="archive-head">
     <{{archive_heading_tag}} id="archive-heading">Archive</{{archive_heading_tag}}>
-    <p>Essays and notes, ordered by publication date.</p>
+    <p>Browse by tag, year, or keyword.</p>
   </header>
+  <div class="archive-controls" data-archive-controls hidden>
+    <div class="archive-querybar" role="search" aria-label="Search archive">
+      <label class="archive-field" for="archive-search">Search
+        <input id="archive-search" type="search" placeholder="Search articles…" aria-describedby="archive-search-help" autocomplete="off" data-archive-search>
+      </label>
+      <label class="archive-field" for="archive-year">Year
+        <select id="archive-year" data-archive-year>
+          <option value="">All years</option>
+          {{archive_year_options}}
+        </select>
+      </label>
+    </div>
+    <p id="archive-search-help" class="archive-search-help">Search titles, summaries, and tags.</p>
+    <div class="archive-tagbar">
+      <span class="archive-control-label">Tags</span>
+      <div class="archive-filters" role="group" aria-label="Filter by tag">{{archive_tag_filters}}</div>
+    </div>
+    <div class="archive-results-bar">
+      <p class="archive-result" data-archive-result role="status" aria-live="polite">{{archive_count}} posts</p>
+      <button class="archive-reset" type="button" data-archive-reset hidden>Clear filters</button>
+    </div>
+  </div>
+  <p class="archive-empty" data-archive-empty hidden>No posts match. Try another tag or search term.</p>
   <div class="archive-list">{{archive_rows}}</div>
 </section>
